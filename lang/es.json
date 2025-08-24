@@ -3,6 +3,16 @@
     "welcome": "¡Bienvenido! Este bot está ahora en español.",
     "choose_lang": "¿Qué idioma deseas usar?",
     "lang_set": "Idioma cambiado correctamente a Español.",
-    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad.",
-    "error": "Ha ocurrido un error. Inténtalo de nuevo."
+    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad, /ping para medir latencia, /server para elegir destino de subida, /hapi para cambiar tu API de Hydrax y /cancel para cancelar procesos.",
+    "error": "Ha ocurrido un error. Inténtalo de nuevo.",
+    "pinging": "Midiendo latencia...",
+    "pong": "¡Pong! Latencia: {ms} ms.",
+    "choose_server": "¿Qué servidor deseas usar?",
+    "server_set_telegram": "Servidor cambiado a 🚀Telegram. Los archivos se subirán aquí.",
+    "server_set_hydrax": "Servidor cambiado a 🦎Hydrax. Los videos se subirán a Hydrax.",
+    "send_hapi": "Envía tu nueva API de Hydrax:",
+    "confirm_hapi": "¿Seguro que quieres usar esta API?\n{api}",
+    "hapi_set_ok": "¡API de Hydrax actualizada correctamente!",
+    "hapi_set_cancel": "Operación cancelada. La API no cambió.",
+    "cancel_ok": "Operación cancelada para tu usuario."
 }
