@@ -13,7 +13,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 CREATOR_ID = int(os.getenv("CREATOR_ID"))
 HYDRAX_API_ID = os.getenv("HYDRAX_API_ID")
 
-# Logging con hora UTC
 logging.basicConfig(
     filename="bot.log",
     level=logging.INFO,
@@ -44,6 +43,8 @@ user_server = {}  # user_id: "telegram" or "hydrax"
 user_hydrax_api = {}  # user_id: api_key
 user_pending_hapi = {}  # user_id: api_key (temporal hasta confirmación)
 user_pending_cancel = set()  # usuarios con proceso cancelable en curso
+user_ads_state = {}  # user_id: dict con estado del anuncio
+known_users = set([CREATOR_ID])  # todos los que han iniciado el bot
 
 app = Client("auu_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -58,6 +59,7 @@ def t(user_id, key):
 async def start(client, message):
     user_id = message.from_user.id
     lang = get_user_lang(user_id)
+    known_users.add(user_id)
     if user_id not in allowed_users:
         await message.reply(LANGS[lang]["not_allowed"])
         log_event(f"Intento de acceso denegado: {user_id}")
@@ -192,8 +194,8 @@ async def hapi_command(client, message):
 @app.on_message(filters.text & filters.user(list(allowed_users)))
 async def hapi_receive(client, message):
     user_id = message.from_user.id
+    # Si está esperando API de Hydrax:
     if user_id in user_pending_hapi and user_pending_hapi[user_id] is None:
-        # Recibe api, pide confirmación
         api_candidate = message.text.strip()
         user_pending_hapi[user_id] = api_candidate
         kb = InlineKeyboardMarkup([
@@ -202,6 +204,22 @@ async def hapi_receive(client, message):
         ])
         await message.reply(t(user_id, "confirm_hapi").format(api=api_candidate), reply_markup=kb)
         log_event(f"Usuario {user_id} envió api para /hapi (pendiente confirmación)")
+        return
+
+    # Si está en proceso de anuncio (solo CREATOR_ID)
+    if user_id == CREATOR_ID and user_id in user_ads_state:
+        state = user_ads_state[user_id]
+        if state["step"] == "collecting":
+            # Guarda el mensaje y pregunta si agregar más
+            state["messages"].append(message.text)
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton(t(user_id, "ads_yes"), callback_data="ads_more"),
+                 InlineKeyboardButton(t(user_id, "ads_no"), callback_data="ads_no_more")]
+            ])
+            await message.reply(t(user_id, "ads_add_more"), reply_markup=kb)
+            state["step"] = "add_more"
+            log_event(f"Anuncio: Añadido mensaje por {user_id}")
+            return
 
 @app.on_callback_query(filters.regex("^hapi_"))
 async def hapi_confirm_callback(client, callback_query):
@@ -225,10 +243,83 @@ async def cancel_command(client, message):
     if user_id not in allowed_users:
         await message.reply(t(user_id, "not_allowed"))
         return
-    # Marca usuario como cancelando; integración real debe abortar procesos en curso
     user_pending_cancel.add(user_id)
+    # Cancela anuncios en curso
+    if user_id in user_ads_state:
+        del user_ads_state[user_id]
+        await message.reply(t(user_id, "cancel_ok"))
+        log_event(f"Usuario {user_id} canceló anuncio en curso.")
+        return
     await message.reply(t(user_id, "cancel_ok"))
     log_event(f"Usuario {user_id} usó /cancel.")
+
+# ----------------------- ANUNCIOS /ads ------------------------------
+
+@app.on_message(filters.command("ads"))
+async def ads_command(client, message):
+    user_id = message.from_user.id
+    if user_id != CREATOR_ID:
+        await message.reply(t(user_id, "not_allowed"))
+        log_event(f"Usuario {user_id} intentó usar /ads sin permiso.")
+        return
+    user_ads_state[user_id] = {"step": "collecting", "messages": []}
+    await message.reply(t(user_id, "ads_first"))
+    log_event("Comenzando proceso de anuncio (/ads)")
+
+@app.on_callback_query(filters.regex("^ads_"))
+async def ads_callback(client, callback_query):
+    user_id = callback_query.from_user.id
+    if user_id != CREATOR_ID or user_id not in user_ads_state:
+        await callback_query.answer(t(user_id, "not_allowed"), show_alert=True)
+        return
+    state = user_ads_state[user_id]
+    if callback_query.data == "ads_more":
+        state["step"] = "collecting"
+        await callback_query.message.reply(t(user_id, "ads_next"))
+        log_event("Solicitando siguiente mensaje para anuncio (/ads)")
+        return
+    if callback_query.data == "ads_no_more":
+        # Muestra vista previa y pregunta si enviar/cancelar
+        preview = "\n\n".join(state["messages"])
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton(t(user_id, "ads_send"), callback_data="ads_send"),
+             InlineKeyboardButton(t(user_id, "ads_cancel"), callback_data="ads_cancel")]
+        ])
+        await callback_query.message.reply(t(user_id, "ads_preview").format(preview=preview), reply_markup=kb)
+        state["step"] = "preview"
+        log_event("Vista previa de anuncio generada (/ads)")
+        return
+    if callback_query.data == "ads_cancel":
+        del user_ads_state[user_id]
+        await callback_query.message.edit_text(t(user_id, "ads_cancelled"))
+        log_event("Anuncio cancelado (/ads)")
+        return
+    if callback_query.data == "ads_send":
+        # Empieza el envío, muestra progreso
+        state["step"] = "sending"
+        preview = "\n\n".join(state["messages"])
+        await callback_query.message.edit_text(t(user_id, "ads_sending"))
+        # Enviar anuncio a todos los usuarios permitidos (menos el creador)
+        users_to_send = [u for u in known_users if u in allowed_users and u != CREATOR_ID]
+        sent = 0
+        failed = 0
+        blocked = 0
+        total = len(users_to_send)
+        progress_msg = await app.send_message(CREATOR_ID, t(user_id, "ads_progress").format(sent=sent, total=total, blocked=blocked))
+        for u in users_to_send:
+            try:
+                for msg in state["messages"]:
+                    await app.send_message(u, msg)
+                    time.sleep(0.5)
+                sent += 1
+            except Exception as e:
+                log_event(f"Fallo al enviar anuncio a {u}: {e}")
+                blocked += 1
+            await progress_msg.edit_text(t(user_id, "ads_progress").format(sent=sent, total=total, blocked=blocked))
+        await app.send_message(CREATOR_ID, t(user_id, "ads_summary").format(sent=sent, total=total, blocked=blocked))
+        log_event(f"Anuncio enviado: {sent} usuarios, {blocked} bloqueados.")
+        del user_ads_state[user_id]
+        return
 
 if __name__ == "__main__":
     log_event("Bot iniciado.")
