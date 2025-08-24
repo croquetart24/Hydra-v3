@@ -34,5 +34,6 @@
     "video_done": "¡Subida completa! Respuesta de Hydrax:",
     "video_error": "Error durante la subida del video.",
     "video_queued": "Tu archivo/video ha sido añadido a la cola y se procesará después del actual.",
-    "video_cancelled": "Cola de videos cancelada y vaciada."
+    "video_cancelled": "Cola de videos cancelada y vaciada.",
+    "main_instruction": "Este bot sirve para subir videos a Hydrax. Por favor, envía un video de Telegram o un enlace directo a un archivo de video para empezar."
 }
