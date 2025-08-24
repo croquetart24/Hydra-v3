@@ -14,6 +14,7 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CREATOR_ID = int(os.getenv("CREATOR_ID"))
 HYDRAX_API_ID = os.getenv("HYDRAX_API_ID")
+SESSION = os.getenv("SESSION")
 
 # Logging
 logging.basicConfig(
@@ -41,6 +42,7 @@ allowed_users = set(load_json("allowed_users.json", [CREATOR_ID]))
 user_langs = load_json("user_langs.json", {})
 user_server = load_json("user_server.json", {})
 user_hydrax_api = load_json("user_hydrax_api.json", {})
+user_session = load_json("user_session.json", {"session": SESSION})
 
 def load_lang(lang_code):
     with open(f'lang/{lang_code}.json', 'r', encoding="utf-8") as f:
@@ -55,15 +57,14 @@ DEFAULT_LANG = "en"
 user_video_queue = {}  # user_id: [ (message, video_info/url) ]
 user_uploading = {}    # user_id: bool
 user_pending_hapi = {}  # user_id: api_key (temporal hasta confirmación)
+user_pending_session = {}  # user_id: session string (temporal hasta confirmación)
 user_ads_state = {}  # user_id: dict con estado del anuncio
 known_users = set(load_json("allowed_users.json", [CREATOR_ID]))
 
 TEMP_DIR = "temp"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-# Dos clientes Pyrogram: uno bot clásico, otro userbot solo para descargas
 bot_app = Client("AUUBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-user_app = Client("AUUUserbot", api_id=API_ID, api_hash=API_HASH)
 
 def get_user_lang(user_id):
     return user_langs.get(str(user_id), DEFAULT_LANG)
@@ -94,6 +95,19 @@ async def download_url(url, dest, message, user_id):
                     percent = downloaded * 100 / total if total else 0
                     await message.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(percent)}")
     return dest
+
+async def download_with_session(file_id, file_name, message, user_id):
+    session_string = user_session.get("session", SESSION)
+    if not session_string:
+        await message.edit_text(t(user_id, "session_missing"))
+        return None
+    # Cliente usuario temporal para la descarga
+    temp_client = Client("AUUTempUser", api_id=API_ID, api_hash=API_HASH, session_string=session_string)
+    await temp_client.start()
+    local_path = os.path.join(TEMP_DIR, file_name)
+    await temp_client.download_media(file_id, file_name=local_path, progress=lambda cur, tot: asyncio.create_task(message.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(cur * 100 / tot if tot > 0 else 0)}")))
+    await temp_client.stop()
+    return local_path
 
 async def upload_to_hydrax(api_id, file_path, file_name, file_type, progress_callback):
     import requests
@@ -126,13 +140,10 @@ async def process_video_queue(user_id):
                 file_id = video_info["file_id"]
                 file_name = video_info.get("file_name", "video.mp4")
                 file_type = video_info.get("mime_type", "video/mp4")
-                local_path = os.path.join(TEMP_DIR, file_name)
-                try:
-                    # Intenta descargar con el bot
-                    await bot_app.download_media(file_id, file_name=local_path, progress=lambda cur, tot: asyncio.create_task(temp_msg.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(cur * 100 / tot if tot > 0 else 0)}")))
-                except Exception:
-                    # Si falla, descarga con el userbot
-                    await user_app.download_media(file_id, file_name=local_path, progress=lambda cur, tot: asyncio.create_task(temp_msg.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(cur * 100 / tot if tot > 0 else 0)}")))
+                # Descarga usando SESSION
+                local_path = await download_with_session(file_id, file_name, temp_msg, user_id)
+                if not local_path:
+                    continue
             elif isinstance(video_info, str):  # URL directa
                 file_name = video_info.split("/")[-1]
                 file_type = "video/mp4" if file_name.endswith(".mp4") else "application/octet-stream"
@@ -207,6 +218,7 @@ async def ayuda(client, message):
         "• <b>/ayuda</b> — Muestra esta ayuda detallada 🆘.\n"
         "• <b>/cancel</b> — Cancela la operación en curso ⏹️.\n"
         "• <b>/hapi</b> — Cambia la API Key de Hydrax 🔑.\n"
+        "• <b>/session</b> — Cambia la SESSION string para descargas avanzadas.\n"
         "• <b>/log</b> — Recupera el registro de actividad 📄.\n"
         "• <b>/ping</b> — Mide la latencia del bot 📶.\n"
         "• <b>/remove</b> — Elimina un usuario de la lista de permitidos 🚫.\n"
@@ -216,6 +228,44 @@ async def ayuda(client, message):
     )
     await message.reply(ayuda_text, parse_mode="html")
     log_event(f"Usuario {user_id} solicitó ayuda.")
+
+@bot_app.on_message(filters.command("session"))
+async def session_command(client, message):
+    user_id = message.from_user.id
+    if user_id != CREATOR_ID:
+        await message.reply(t(user_id, "not_allowed"))
+        return
+    await message.reply(t(user_id, "send_session"))
+    user_pending_session[user_id] = None
+
+@bot_app.on_message(filters.text & filters.user([CREATOR_ID]))
+async def session_receive(client, message):
+    user_id = message.from_user.id
+    # Configuración de SESSION
+    if user_id in user_pending_session and user_pending_session[user_id] is None:
+        session_candidate = message.text.strip()
+        user_pending_session[user_id] = session_candidate
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅Si", callback_data="session_ok"),
+             InlineKeyboardButton("🚫No", callback_data="session_cancel")]
+        ])
+        await message.reply(t(user_id, "confirm_session").format(session=session_candidate), reply_markup=kb)
+        return
+
+@bot_app.on_callback_query(filters.regex("^session_"))
+async def session_confirm_callback(client, callback_query):
+    user_id = callback_query.from_user.id
+    if user_id not in user_pending_session:
+        await callback_query.answer(t(user_id, "not_allowed"), show_alert=True)
+        return
+    if callback_query.data == "session_ok":
+        user_session["session"] = user_pending_session[user_id]
+        save_json("user_session.json", user_session)
+        await callback_query.message.edit_text(t(user_id, "session_set_ok"))
+        del user_pending_session[user_id]
+    else:
+        await callback_query.message.edit_text(t(user_id, "session_set_cancel"))
+        del user_pending_session[user_id]
 
 @bot_app.on_message(filters.command("add"))
 async def add_user(client, message):
@@ -300,14 +350,17 @@ async def text_receive(client, message):
 
     # Procesamiento de videos y enlaces
     if user_server.get(str(user_id), "hydrax") == "hydrax":
-        if message.video:
+        if message.video or message.document and (message.document.mime_type or "").startswith("video/"):
+            file_id = message.video.file_id if message.video else message.document.file_id
+            file_name = (message.video.file_name if message.video else message.document.file_name) or "video.mp4"
+            file_type = (message.video.mime_type if message.video else message.document.mime_type) or "video/mp4"
             video_info = {
-                "file_id": message.video.file_id,
-                "file_name": message.video.file_name,
-                "mime_type": message.video.mime_type
+                "file_id": file_id,
+                "file_name": file_name,
+                "mime_type": file_type
             }
             user_video_queue.setdefault(user_id, []).append((message, video_info))
-            log_event(f"Video recibido de {user_id} (Telegram): {video_info['file_name']}")
+            log_event(f"Video recibido de {user_id} (Telegram): {file_name}")
             if not user_uploading.get(user_id, False):
                 asyncio.create_task(process_video_queue(user_id))
             else:
@@ -340,6 +393,21 @@ async def hapi_confirm_callback(client, callback_query):
         await callback_query.message.edit_text(t(user_id, "hapi_set_cancel"))
         del user_pending_hapi[user_id]
 
+@bot_app.on_callback_query(filters.regex("^session_"))
+async def session_confirm_callback(client, callback_query):
+    user_id = callback_query.from_user.id
+    if user_id not in user_pending_session:
+        await callback_query.answer(t(user_id, "not_allowed"), show_alert=True)
+        return
+    if callback_query.data == "session_ok":
+        user_session["session"] = user_pending_session[user_id]
+        save_json("user_session.json", user_session)
+        await callback_query.message.edit_text(t(user_id, "session_set_ok"))
+        del user_pending_session[user_id]
+    else:
+        await callback_query.message.edit_text(t(user_id, "session_set_cancel"))
+        del user_pending_session[user_id]
+
 @bot_app.on_message(filters.command("cancel"))
 async def cancel_command(client, message):
     user_id = message.from_user.id
@@ -351,14 +419,7 @@ async def cancel_command(client, message):
     await message.reply(t(user_id, "cancel_ok"))
     log_event(f"Usuario {user_id} usó /cancel.")
 
-async def main():
-    await user_app.start()
-    await bot_app.start()
-    print("Bot y userbot iniciados correctamente. Esperando mensajes...")
-    await idle()
-    await user_app.stop()
-    await bot_app.stop()
-
 if __name__ == "__main__":
-    from pyrogram import idle
-    asyncio.run(main())
+    log_event("Bot iniciado.")
+    print("Bot iniciado correctamente. Esperando mensajes...")
+    bot_app.run()
