@@ -3,7 +3,7 @@
     "welcome": "¡Bienvenido! Este bot está ahora en español.",
     "choose_lang": "¿Qué idioma deseas usar?",
     "lang_set": "Idioma cambiado correctamente a Español.",
-    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad, /ping para medir latencia, /server para elegir destino de subida, /hapi para cambiar tu API de Hydrax y /cancel para cancelar procesos. El comando /ads permite crear y enviar anuncios a todos los usuarios. Cuando envíes un video o enlace directo, se subirá a Hydrax y se te mostrará el progreso.",
+    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad, /ping para medir latencia, /server para elegir destino de subida, /hapi para cambiar tu API de Hydrax y /session para cambiar la SESSION string, y /cancel para cancelar procesos. El comando /ads permite crear y enviar anuncios a todos los usuarios. Cuando envíes un video o enlace directo, se subirá a Hydrax y se te mostrará el progreso.",
     "error": "Ha ocurrido un error. Inténtalo de nuevo.",
     "pinging": "Midiendo latencia...",
     "pong": "¡Pong! Latencia: {ms} ms.",
@@ -14,6 +14,11 @@
     "confirm_hapi": "¿Seguro que quieres usar esta API?\n{api}",
     "hapi_set_ok": "¡API de Hydrax actualizada correctamente!",
     "hapi_set_cancel": "Operación cancelada. La API no cambió.",
+    "send_session": "Envía la nueva cadena SESSION de usuario:",
+    "confirm_session": "¿Seguro que quieres usar esta SESSION?\n{session}",
+    "session_set_ok": "¡SESSION actualizada correctamente!",
+    "session_set_cancel": "Operación cancelada. La SESSION no cambió.",
+    "session_missing": "La cadena SESSION no está configurada. Usa /session para añadirla.",
     "cancel_ok": "Operación cancelada para tu usuario.",
     "video_upload_start": "¡Recibido! Comenzando la subida a Hydrax...",
     "video_preparing": "Preparando el archivo para subir...",
@@ -23,5 +28,5 @@
     "video_error": "Error durante la subida del video.",
     "video_queued": "Tu archivo/video ha sido añadido a la cola y se procesará después del actual.",
     "video_cancelled": "Cola de videos cancelada y vaciada.",
-    "main_instruction": "Este bot sirve para subir videos a Hydrax. Por favor, envía un video de Telegram o un enlace directo a un archivo de video para empezar."
+    "main_instruction": "Este bot sirve para subir videos a Hydrax. Por favor, envía un video de Telegram, documento (video) o un enlace directo a un archivo de video para empezar."
 }
