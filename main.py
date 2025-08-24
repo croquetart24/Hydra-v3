@@ -11,6 +11,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 # Variables de entorno
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 CREATOR_ID = int(os.getenv("CREATOR_ID"))
 HYDRAX_API_ID = os.getenv("HYDRAX_API_ID")
 
@@ -60,7 +61,9 @@ known_users = set(load_json("allowed_users.json", [CREATOR_ID]))
 TEMP_DIR = "temp"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-app = Client("AUUUserBot", api_id=API_ID, api_hash=API_HASH)
+# Dos clientes Pyrogram: uno bot clásico, otro userbot solo para descargas
+bot_app = Client("AUUBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+user_app = Client("AUUUserbot", api_id=API_ID, api_hash=API_HASH)
 
 def get_user_lang(user_id):
     return user_langs.get(str(user_id), DEFAULT_LANG)
@@ -124,7 +127,12 @@ async def process_video_queue(user_id):
                 file_name = video_info.get("file_name", "video.mp4")
                 file_type = video_info.get("mime_type", "video/mp4")
                 local_path = os.path.join(TEMP_DIR, file_name)
-                await app.download_media(file_id, file_name=local_path, progress=lambda cur, tot: asyncio.create_task(temp_msg.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(cur * 100 / tot if tot > 0 else 0)}")))
+                try:
+                    # Intenta descargar con el bot
+                    await bot_app.download_media(file_id, file_name=local_path, progress=lambda cur, tot: asyncio.create_task(temp_msg.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(cur * 100 / tot if tot > 0 else 0)}")))
+                except Exception:
+                    # Si falla, descarga con el userbot
+                    await user_app.download_media(file_id, file_name=local_path, progress=lambda cur, tot: asyncio.create_task(temp_msg.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(cur * 100 / tot if tot > 0 else 0)}")))
             elif isinstance(video_info, str):  # URL directa
                 file_name = video_info.split("/")[-1]
                 file_type = "video/mp4" if file_name.endswith(".mp4") else "application/octet-stream"
@@ -157,7 +165,7 @@ async def process_video_queue(user_id):
         await asyncio.sleep(1)
     user_uploading[user_id] = False
 
-@app.on_message(filters.command("start"))
+@bot_app.on_message(filters.command("start"))
 async def start(client, message):
     user_id = message.from_user.id
     known_users.add(user_id)
@@ -170,7 +178,7 @@ async def start(client, message):
     await message.reply(t(user_id, "welcome"))
     log_event(f"Usuario {user_id} inició el bot.")
 
-@app.on_message(filters.command("setlang"))
+@bot_app.on_message(filters.command("setlang"))
 async def setlang(client, message):
     user_id = message.from_user.id
     kb = InlineKeyboardMarkup([
@@ -180,7 +188,7 @@ async def setlang(client, message):
     await message.reply(t(user_id, "choose_lang"), reply_markup=kb)
     log_event(f"Usuario {user_id} solicitó cambio de idioma.")
 
-@app.on_callback_query(filters.regex("^lang_"))
+@bot_app.on_callback_query(filters.regex("^lang_"))
 async def lang_callback(client, callback_query):
     user_id = callback_query.from_user.id
     lang_code = callback_query.data.split("_")[1]
@@ -189,7 +197,7 @@ async def lang_callback(client, callback_query):
     await callback_query.message.edit_text(LANGS[lang_code]["lang_set"])
     log_event(f"Usuario {user_id} cambió idioma a {lang_code}.")
 
-@app.on_message(filters.command("ayuda"))
+@bot_app.on_message(filters.command("ayuda"))
 async def ayuda(client, message):
     user_id = message.from_user.id
     ayuda_text = (
@@ -209,7 +217,7 @@ async def ayuda(client, message):
     await message.reply(ayuda_text, parse_mode="html")
     log_event(f"Usuario {user_id} solicitó ayuda.")
 
-@app.on_message(filters.command("add"))
+@bot_app.on_message(filters.command("add"))
 async def add_user(client, message):
     user_id = message.from_user.id
     if user_id != CREATOR_ID:
@@ -225,7 +233,7 @@ async def add_user(client, message):
         await message.reply("Error en el formato. Usa /add <user_id>")
         log_event(f"Error añadiendo usuario: {e}")
 
-@app.on_message(filters.command("remove"))
+@bot_app.on_message(filters.command("remove"))
 async def remove_user(client, message):
     user_id = message.from_user.id
     if user_id != CREATOR_ID:
@@ -241,7 +249,7 @@ async def remove_user(client, message):
         await message.reply("Error en el formato. Usa /remove <user_id>")
         log_event(f"Error eliminando usuario: {e}")
 
-@app.on_message(filters.command("ping"))
+@bot_app.on_message(filters.command("ping"))
 async def ping_command(client, message):
     user_id = message.from_user.id
     start = time.time()
@@ -251,7 +259,7 @@ async def ping_command(client, message):
     await sent.edit_text(t(user_id, "pong").format(ms=ms))
     log_event(f"Usuario {user_id} usó /ping: {ms}ms")
 
-@app.on_message(filters.command("server"))
+@bot_app.on_message(filters.command("server"))
 async def server_command(client, message):
     user_id = message.from_user.id
     kb = InlineKeyboardMarkup([
@@ -261,7 +269,7 @@ async def server_command(client, message):
     await message.reply(t(user_id, "choose_server"), reply_markup=kb)
     log_event(f"Usuario {user_id} solicitó /server.")
 
-@app.on_callback_query(filters.regex("^server_"))
+@bot_app.on_callback_query(filters.regex("^server_"))
 async def server_callback(client, callback_query):
     user_id = callback_query.from_user.id
     srv = callback_query.data.split("_")[1]
@@ -270,13 +278,13 @@ async def server_callback(client, callback_query):
     await callback_query.message.edit_text(t(user_id, f"server_set_{srv}"))
     log_event(f"Usuario {user_id} cambió server a {srv}.")
 
-@app.on_message(filters.command("hapi"))
+@bot_app.on_message(filters.command("hapi"))
 async def hapi_command(client, message):
     user_id = message.from_user.id
     await message.reply(t(user_id, "send_hapi"))
     user_pending_hapi[user_id] = None
 
-@app.on_message(filters.text & filters.user(list(allowed_users)))
+@bot_app.on_message(filters.text & filters.user(list(allowed_users)))
 async def text_receive(client, message):
     user_id = message.from_user.id
     # Configuración de HAPI
@@ -317,7 +325,7 @@ async def text_receive(client, message):
 
     await message.reply(t(user_id, "main_instruction"))
 
-@app.on_callback_query(filters.regex("^hapi_"))
+@bot_app.on_callback_query(filters.regex("^hapi_"))
 async def hapi_confirm_callback(client, callback_query):
     user_id = callback_query.from_user.id
     if user_id not in user_pending_hapi:
@@ -332,7 +340,7 @@ async def hapi_confirm_callback(client, callback_query):
         await callback_query.message.edit_text(t(user_id, "hapi_set_cancel"))
         del user_pending_hapi[user_id]
 
-@app.on_message(filters.command("cancel"))
+@bot_app.on_message(filters.command("cancel"))
 async def cancel_command(client, message):
     user_id = message.from_user.id
     if user_video_queue.get(user_id):
@@ -343,7 +351,14 @@ async def cancel_command(client, message):
     await message.reply(t(user_id, "cancel_ok"))
     log_event(f"Usuario {user_id} usó /cancel.")
 
+async def main():
+    await user_app.start()
+    await bot_app.start()
+    print("Bot y userbot iniciados correctamente. Esperando mensajes...")
+    await idle()
+    await user_app.stop()
+    await bot_app.stop()
+
 if __name__ == "__main__":
-    log_event("Bot iniciado.")
-    print("Userbot iniciado. Recuerda que debes autenticarte con tu sesión de usuario de Telegram la primera vez.")
-    app.run()
+    from pyrogram import idle
+    asyncio.run(main())
