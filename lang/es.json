@@ -1,0 +1,8 @@
+{
+    "not_allowed": "No tienes permiso para usar este bot.",
+    "welcome": "¡Bienvenido! Este bot está ahora en español.",
+    "choose_lang": "¿Qué idioma deseas usar?",
+    "lang_set": "Idioma cambiado correctamente a Español.",
+    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad.",
+    "error": "Ha ocurrido un error. Inténtalo de nuevo."
+}
