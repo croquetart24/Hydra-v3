@@ -34,5 +34,6 @@
     "video_done": "Upload complete! Hydrax response:",
     "video_error": "Error during video upload.",
     "video_queued": "Your video/file has been added to the queue and will be processed after the current one.",
-    "video_cancelled": "Video queue cancelled and emptied."
+    "video_cancelled": "Video queue cancelled and emptied.",
+    "main_instruction": "This bot is for uploading videos to Hydrax. Please send a Telegram video or a direct video file link to begin."
 }
