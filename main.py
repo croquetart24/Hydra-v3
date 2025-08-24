@@ -7,7 +7,7 @@ import asyncio
 import aiohttp
 from datetime import datetime, timezone
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -48,7 +48,7 @@ user_pending_cancel = set()  # usuarios con proceso cancelable en curso
 user_ads_state = {}  # user_id: dict con estado del anuncio
 known_users = set([CREATOR_ID])  # todos los que han iniciado el bot
 
-# --- Nueva estructura para la cola de subida de videos por usuario ---
+# --- Cola de videos por usuario ---
 user_video_queue = {}  # user_id: [ (message, video_info/url) ]
 user_uploading = {}    # user_id: bool
 
@@ -78,27 +78,17 @@ async def upload_to_hydrax(api_id, file_path, file_name, file_type, progress_cal
     """
     url = f"http://up.hydrax.net/{api_id}"
     file_size = os.path.getsize(file_path)
-    chunk_size = 1024 * 1024  # 1 MB
-
-    # Hydrax no soporta streaming puro, así que simulamos el progreso enviando por chunks.
-    with open(file_path, 'rb') as f:
-        sent = 0
-        chunks = []
-        while True:
-            chunk = f.read(chunk_size)
-            if not chunk:
-                break
-            chunks.append(chunk)
-            sent += len(chunk)
-            percent = sent * 100 / file_size
-            await progress_callback(percent)
-        # Enviar todo en una sola petición (Hydrax requiere el archivo completo)
-        files = {'file': (file_name, open(file_path, 'rb'), file_type)}
-        try:
+    # Hydrax requiere el archivo completo, así que la barra de progreso real se simula en la descarga.
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'file': (file_name, f, file_type)}
+            # No hay progreso real posible en requests.post, así que enviamos una sola vez y al terminar el callback marca 100%
+            await progress_callback(0)
             r = requests.post(url, files=files)
+            await progress_callback(100)
             return r.text
-        except Exception as e:
-            return None
+    except Exception as e:
+        return None
 
 async def process_video_queue(user_id):
     """
@@ -108,21 +98,21 @@ async def process_video_queue(user_id):
     while user_video_queue.get(user_id):
         item = user_video_queue[user_id].pop(0)
         message, video_info = item
-        # Obtener datos del video
         lang = get_user_lang(user_id)
         hydrax_api = user_hydrax_api.get(user_id, HYDRAX_API_ID)
         await message.reply(t(user_id, "video_upload_start"))
-        # Descargar el video si es de Telegram
         local_path = None
         file_name = None
         file_type = None
         temp_msg = await message.reply(t(user_id, "video_preparing"))
         try:
+            # --- DESCARGA ---
             if isinstance(video_info, dict):  # Es video Telegram
                 file_id = video_info["file_id"]
                 file_name = video_info.get("file_name", "video.mp4")
                 file_type = video_info.get("mime_type", "video/mp4")
-                local_path = await app.download_media(file_id, file_name=file_name)
+                # Progreso de descarga (simulado por tamaño del archivo)
+                local_path = await app.download_media(file_id, file_name=file_name, progress=lambda current, total: asyncio.create_task(temp_msg.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(current * 100 / total if total > 0 else 0)}")))
             elif isinstance(video_info, str):  # Es URL directa
                 file_name = video_info.split("/")[-1]
                 file_type = "video/mp4" if file_name.endswith(".mp4") else "application/octet-stream"
@@ -141,7 +131,7 @@ async def process_video_queue(user_id):
                 await temp_msg.edit_text(t(user_id, "video_error"))
                 continue
 
-            # Subida a Hydrax
+            # --- SUBIDA A HYDRAX ---
             async def progress_callback(percent):
                 await temp_msg.edit_text(f"{t(user_id, 'video_uploading')}\n{make_progress_bar(percent)}")
 
@@ -156,13 +146,11 @@ async def process_video_queue(user_id):
             await temp_msg.edit_text(t(user_id, "video_error"))
             log_event(f"Excepción en subida para {user_id}: {e}")
         finally:
-            # Borra archivos temporales
             try:
                 if local_path and os.path.exists(local_path):
                     os.remove(local_path)
             except Exception:
                 pass
-        # Espera un momento antes del siguiente
         await asyncio.sleep(1)
     user_uploading[user_id] = False
 
@@ -176,7 +164,7 @@ async def start(client, message):
         log_event(f"Intento de acceso denegado: {user_id}")
         return
     await message.reply(LANGS[lang]["welcome"])
-    user_server[user_id] = "telegram"
+    user_server[user_id] = "hydrax"  # Ahora el server predeterminado es Hydrax
     user_hydrax_api[user_id] = HYDRAX_API_ID
     log_event(f"Usuario {user_id} inició el bot.")
 
@@ -333,7 +321,7 @@ async def hapi_receive(client, message):
 
     # --- VIDEO/URL ENTRANTE ---
     # Procesa solo si está permitido y tiene server Hydrax activo
-    if user_server.get(user_id, "telegram") == "hydrax":
+    if user_server.get(user_id, "hydrax") == "hydrax":
         # Video de Telegram
         if message.video:
             video_info = {
@@ -357,6 +345,9 @@ async def hapi_receive(client, message):
             else:
                 await message.reply(t(user_id, "video_queued"))
             return
+
+    # RESPUESTA PARA MENSAJES NO COMANDO NI VIDEO
+    await message.reply(t(user_id, "main_instruction"))
 
 @app.on_callback_query(filters.regex("^hapi_"))
 async def hapi_confirm_callback(client, callback_query):
@@ -462,4 +453,5 @@ async def ads_callback(client, callback_query):
 
 if __name__ == "__main__":
     log_event("Bot iniciado.")
+    print("Si aparece el mensaje de TgCrypto, instala con: pip install tgcrypto para mejorar la velocidad de descarga de videos de Telegram.")
     app.run()
