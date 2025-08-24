@@ -1,2 +1,4 @@
+4. 2025-08-24 — Añadida función principal: subida automática de videos y enlaces directos a Hydrax con cola por usuario y barra de progreso actualizable. Archivos modificados: main.py, lang/es.json, lang/en.json, CHANGELOG.md
+3. 2025-08-24 — Añadida función de anuncios (/ads): permite enviar anuncios multi-mensaje a todos los usuarios permitidos, con vista previa, confirmación, progreso en tiempo real y registro detallado. Archivos modificados: main.py, lang/es.json, lang/en.json, CHANGELOG.md
 2. 2025-08-24 — Añadidos comandos /ping, /server, /hapi y /cancel, soporte de idioma y configuración individual, y estructuración para subida a Hydrax. Archivos modificados: main.py, lang/es.json, lang/en.json, CHANGELOG.md
 1. 2025-08-24 — Estructura inicial del bot, protección por usuario, multilenguaje, comandos básicos, logging detallado. Archivos modificados: main.py, lang/es.json, lang/en.json, CHANGELOG.md
