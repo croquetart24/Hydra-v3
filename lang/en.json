@@ -1,0 +1,8 @@
+{
+    "not_allowed": "You are not allowed to use this bot.",
+    "welcome": "Welcome! The bot is now in English.",
+    "choose_lang": "Which language do you want to use?",
+    "lang_set": "Language changed successfully to English.",
+    "help": "This bot helps you manage announcements and files. Use /setlang to change language, /ayuda to see this help, /add and /remove to manage allowed users, /log to get the activity log.",
+    "error": "An error occurred. Please try again."
+}
