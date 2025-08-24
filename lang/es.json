@@ -3,7 +3,7 @@
     "welcome": "¡Bienvenido! Este bot está ahora en español.",
     "choose_lang": "¿Qué idioma deseas usar?",
     "lang_set": "Idioma cambiado correctamente a Español.",
-    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad, /ping para medir latencia, /server para elegir destino de subida, /hapi para cambiar tu API de Hydrax y /cancel para cancelar procesos.",
+    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad, /ping para medir latencia, /server para elegir destino de subida, /hapi para cambiar tu API de Hydrax y /cancel para cancelar procesos. El comando /ads permite crear y enviar anuncios a todos los usuarios.",
     "error": "Ha ocurrido un error. Inténtalo de nuevo.",
     "pinging": "Midiendo latencia...",
     "pong": "¡Pong! Latencia: {ms} ms.",
@@ -14,5 +14,17 @@
     "confirm_hapi": "¿Seguro que quieres usar esta API?\n{api}",
     "hapi_set_ok": "¡API de Hydrax actualizada correctamente!",
     "hapi_set_cancel": "Operación cancelada. La API no cambió.",
-    "cancel_ok": "Operación cancelada para tu usuario."
+    "cancel_ok": "Operación cancelada para tu usuario.",
+    "ads_first": "Envía el primer mensaje del anuncio:",
+    "ads_add_more": "¿Deseas agregar otro mensaje al anuncio?",
+    "ads_yes": "Sí",
+    "ads_no": "No",
+    "ads_next": "Envía el siguiente mensaje del anuncio:",
+    "ads_preview": "Vista previa del anuncio:\n\n{preview}\n\n¿Enviar este anuncio?",
+    "ads_send": "Enviar",
+    "ads_cancel": "Cancelar",
+    "ads_cancelled": "Anuncio cancelado.",
+    "ads_sending": "Enviando anuncio a los usuarios...",
+    "ads_progress": "Enviados: {sent}/{total} | Bloqueados: {blocked}",
+    "ads_summary": "Anuncio completado.\nEnviados: {sent}/{total}\nUsuarios bloqueados: {blocked}"
 }
