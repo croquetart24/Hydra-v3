@@ -3,7 +3,7 @@
     "welcome": "Welcome! The bot is now in English.",
     "choose_lang": "Which language do you want to use?",
     "lang_set": "Language changed successfully to English.",
-    "help": "This bot helps you manage announcements and files. Use /setlang to change language, /ayuda to see this help, /add and /remove to manage allowed users, /log to get the activity log, /ping to measure latency, /server to choose upload destination, /hapi to change your Hydrax API, and /cancel to abort operations.",
+    "help": "This bot helps you manage announcements and files. Use /setlang to change language, /ayuda to see this help, /add and /remove to manage allowed users, /log to get the activity log, /ping to measure latency, /server to choose upload destination, /hapi to change your Hydrax API, and /cancel to abort operations. The /ads command lets you create and send announcements to all users.",
     "error": "An error occurred. Please try again.",
     "pinging": "Measuring latency...",
     "pong": "Pong! Latency: {ms} ms.",
@@ -14,5 +14,17 @@
     "confirm_hapi": "Are you sure you want to use this API?\n{api}",
     "hapi_set_ok": "Hydrax API updated successfully!",
     "hapi_set_cancel": "Operation cancelled. API not changed.",
-    "cancel_ok": "Operation cancelled for your user."
+    "cancel_ok": "Operation cancelled for your user.",
+    "ads_first": "Send the first message of the announcement:",
+    "ads_add_more": "Do you want to add another message to the announcement?",
+    "ads_yes": "Yes",
+    "ads_no": "No",
+    "ads_next": "Send the next message of the announcement:",
+    "ads_preview": "Announcement preview:\n\n{preview}\n\nSend this announcement?",
+    "ads_send": "Send",
+    "ads_cancel": "Cancel",
+    "ads_cancelled": "Announcement cancelled.",
+    "ads_sending": "Sending announcement to users...",
+    "ads_progress": "Sent: {sent}/{total} | Blocked: {blocked}",
+    "ads_summary": "Announcement completed.\nSent: {sent}/{total}\nBlocked users: {blocked}"
 }
