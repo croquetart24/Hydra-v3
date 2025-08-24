@@ -1,1 +1,2 @@
+2. 2025-08-24 — Añadidos comandos /ping, /server, /hapi y /cancel, soporte de idioma y configuración individual, y estructuración para subida a Hydrax. Archivos modificados: main.py, lang/es.json, lang/en.json, CHANGELOG.md
 1. 2025-08-24 — Estructura inicial del bot, protección por usuario, multilenguaje, comandos básicos, logging detallado. Archivos modificados: main.py, lang/es.json, lang/en.json, CHANGELOG.md
