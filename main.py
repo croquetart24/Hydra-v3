@@ -12,6 +12,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 CREATOR_ID = int(os.getenv("CREATOR_ID"))
+HYDRAX_API_ID = os.getenv("HYDRAX_API_ID")
 
 # Logging
 logging.basicConfig(
@@ -24,7 +25,7 @@ logging.basicConfig(
 def log_event(event):
     logging.info(f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} — {event}")
 
-# Carga y persistencia de configuración
+# Persistencia de configuración
 def load_json(filename, default):
     if os.path.exists(filename):
         with open(filename, "r", encoding="utf-8") as f:
@@ -35,13 +36,11 @@ def save_json(filename, data):
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
-# Configuración persistente
 allowed_users = set(load_json("allowed_users.json", [CREATOR_ID]))
 user_langs = load_json("user_langs.json", {})
 user_server = load_json("user_server.json", {})
 user_hydrax_api = load_json("user_hydrax_api.json", {})
 
-# Carga de idiomas
 def load_lang(lang_code):
     with open(f'lang/{lang_code}.json', 'r', encoding="utf-8") as f:
         return json.load(f)
@@ -52,14 +51,12 @@ LANGS = {
 }
 DEFAULT_LANG = "en"
 
-# Cola y estado por usuario
 user_video_queue = {}  # user_id: [ (message, video_info/url) ]
 user_uploading = {}    # user_id: bool
 user_pending_hapi = {}  # user_id: api_key (temporal hasta confirmación)
 user_ads_state = {}  # user_id: dict con estado del anuncio
-known_users = set([CREATOR_ID])  # todos los que han iniciado el bot
+known_users = set(load_json("allowed_users.json", [CREATOR_ID]))
 
-# Carpeta temporal para descargas
 TEMP_DIR = "temp"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
@@ -96,7 +93,6 @@ async def download_url(url, dest, message, user_id):
     return dest
 
 async def upload_to_hydrax(api_id, file_path, file_name, file_type, progress_callback):
-    # El progreso real se simula, ya que Hydrax requiere el archivo completo.
     import requests
     file_size = os.path.getsize(file_path)
     try:
@@ -115,8 +111,7 @@ async def process_video_queue(user_id):
         item = user_video_queue[user_id].pop(0)
         message, video_info = item
         lang = get_user_lang(user_id)
-        hydrax_api = user_hydrax_api.get(str(user_id))
-        if not hydrax_api: hydrax_api = os.getenv("HYDRAX_API_ID")
+        hydrax_api = user_hydrax_api.get(str(user_id), HYDRAX_API_ID)
         await message.reply(t(user_id, "video_upload_start"))
         local_path = None
         file_name = None
@@ -170,7 +165,7 @@ async def start(client, message):
     save_json("allowed_users.json", list(allowed_users))
     user_server[str(user_id)] = "hydrax"
     save_json("user_server.json", user_server)
-    user_hydrax_api[str(user_id)] = os.getenv("HYDRAX_API_ID")
+    user_hydrax_api[str(user_id)] = HYDRAX_API_ID
     save_json("user_hydrax_api.json", user_hydrax_api)
     await message.reply(t(user_id, "welcome"))
     log_event(f"Usuario {user_id} inició el bot.")
@@ -320,7 +315,6 @@ async def text_receive(client, message):
                 await message.reply(t(user_id, "video_queued"))
             return
 
-    # RESPUESTA PARA MENSAJES NO COMANDO NI VIDEO
     await message.reply(t(user_id, "main_instruction"))
 
 @app.on_callback_query(filters.regex("^hapi_"))
@@ -341,7 +335,6 @@ async def hapi_confirm_callback(client, callback_query):
 @app.on_message(filters.command("cancel"))
 async def cancel_command(client, message):
     user_id = message.from_user.id
-    # Vacía la cola de videos
     if user_video_queue.get(user_id):
         user_video_queue[user_id] = []
         await message.reply(t(user_id, "video_cancelled"))
