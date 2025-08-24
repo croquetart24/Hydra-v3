@@ -3,7 +3,7 @@
     "welcome": "¡Bienvenido! Este bot está ahora en español.",
     "choose_lang": "¿Qué idioma deseas usar?",
     "lang_set": "Idioma cambiado correctamente a Español.",
-    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad, /ping para medir latencia, /server para elegir destino de subida, /hapi para cambiar tu API de Hydrax y /cancel para cancelar procesos. El comando /ads permite crear y enviar anuncios a todos los usuarios.",
+    "help": "Este bot te ayuda a gestionar anuncios y archivos. Usa /setlang para cambiar idioma, /ayuda para ver esta ayuda, /add y /remove para gestionar usuarios permitidos, /log para obtener el registro de actividad, /ping para medir latencia, /server para elegir destino de subida, /hapi para cambiar tu API de Hydrax y /cancel para cancelar procesos. El comando /ads permite crear y enviar anuncios a todos los usuarios. Cuando envíes un video o enlace directo, se subirá a Hydrax y se te mostrará el progreso.",
     "error": "Ha ocurrido un error. Inténtalo de nuevo.",
     "pinging": "Midiendo latencia...",
     "pong": "¡Pong! Latencia: {ms} ms.",
@@ -26,5 +26,13 @@
     "ads_cancelled": "Anuncio cancelado.",
     "ads_sending": "Enviando anuncio a los usuarios...",
     "ads_progress": "Enviados: {sent}/{total} | Bloqueados: {blocked}",
-    "ads_summary": "Anuncio completado.\nEnviados: {sent}/{total}\nUsuarios bloqueados: {blocked}"
+    "ads_summary": "Anuncio completado.\nEnviados: {sent}/{total}\nUsuarios bloqueados: {blocked}",
+    "video_upload_start": "¡Recibido! Comenzando la subida a Hydrax...",
+    "video_preparing": "Preparando el archivo para subir...",
+    "video_downloading": "Descargando el archivo...",
+    "video_uploading": "Subiendo a Hydrax...",
+    "video_done": "¡Subida completa! Respuesta de Hydrax:",
+    "video_error": "Error durante la subida del video.",
+    "video_queued": "Tu archivo/video ha sido añadido a la cola y se procesará después del actual.",
+    "video_cancelled": "Cola de videos cancelada y vaciada."
 }
