@@ -3,9 +3,11 @@ import json
 import logging
 import time
 import requests
+import asyncio
+import aiohttp
 from datetime import datetime, timezone
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -46,6 +48,10 @@ user_pending_cancel = set()  # usuarios con proceso cancelable en curso
 user_ads_state = {}  # user_id: dict con estado del anuncio
 known_users = set([CREATOR_ID])  # todos los que han iniciado el bot
 
+# --- Nueva estructura para la cola de subida de videos por usuario ---
+user_video_queue = {}  # user_id: [ (message, video_info/url) ]
+user_uploading = {}    # user_id: bool
+
 app = Client("auu_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 def get_user_lang(user_id):
@@ -54,6 +60,111 @@ def get_user_lang(user_id):
 def t(user_id, key):
     lang = get_user_lang(user_id)
     return LANGS.get(lang, LANGS[DEFAULT_LANG]).get(key, key)
+
+def is_direct_video_url(text):
+    # Detecta enlaces directos a archivos de video
+    if isinstance(text, str):
+        return text.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.webm', '.flv')) and (text.startswith("http://") or text.startswith("https://"))
+    return False
+
+def make_progress_bar(percent, length=20):
+    filled = int(percent / 100 * length)
+    bar = '█' * filled + '-' * (length - filled)
+    return f"[{bar}] {percent:.1f}%"
+
+async def upload_to_hydrax(api_id, file_path, file_name, file_type, progress_callback):
+    """
+    Sube el archivo a Hydrax mostrando el progreso mediante el callback.
+    """
+    url = f"http://up.hydrax.net/{api_id}"
+    file_size = os.path.getsize(file_path)
+    chunk_size = 1024 * 1024  # 1 MB
+
+    # Hydrax no soporta streaming puro, así que simulamos el progreso enviando por chunks.
+    with open(file_path, 'rb') as f:
+        sent = 0
+        chunks = []
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            sent += len(chunk)
+            percent = sent * 100 / file_size
+            await progress_callback(percent)
+        # Enviar todo en una sola petición (Hydrax requiere el archivo completo)
+        files = {'file': (file_name, open(file_path, 'rb'), file_type)}
+        try:
+            r = requests.post(url, files=files)
+            return r.text
+        except Exception as e:
+            return None
+
+async def process_video_queue(user_id):
+    """
+    Procesa la cola de videos para el usuario, uno a uno.
+    """
+    user_uploading[user_id] = True
+    while user_video_queue.get(user_id):
+        item = user_video_queue[user_id].pop(0)
+        message, video_info = item
+        # Obtener datos del video
+        lang = get_user_lang(user_id)
+        hydrax_api = user_hydrax_api.get(user_id, HYDRAX_API_ID)
+        await message.reply(t(user_id, "video_upload_start"))
+        # Descargar el video si es de Telegram
+        local_path = None
+        file_name = None
+        file_type = None
+        temp_msg = await message.reply(t(user_id, "video_preparing"))
+        try:
+            if isinstance(video_info, dict):  # Es video Telegram
+                file_id = video_info["file_id"]
+                file_name = video_info.get("file_name", "video.mp4")
+                file_type = video_info.get("mime_type", "video/mp4")
+                local_path = await app.download_media(file_id, file_name=file_name)
+            elif isinstance(video_info, str):  # Es URL directa
+                file_name = video_info.split("/")[-1]
+                file_type = "video/mp4" if file_name.endswith(".mp4") else "application/octet-stream"
+                local_path = f"temp_{user_id}_{int(time.time())}_{file_name}"
+                async with aiohttp.ClientSession() as sess:
+                    async with sess.get(video_info) as resp:
+                        with open(local_path, "wb") as f:
+                            downloaded = 0
+                            total = int(resp.headers.get('content-length', 0))
+                            async for chunk in resp.content.iter_chunked(1024*1024):
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                percent = downloaded * 100 / total if total else 0
+                                await temp_msg.edit_text(f"{t(user_id, 'video_downloading')}\n{make_progress_bar(percent)}")
+            else:
+                await temp_msg.edit_text(t(user_id, "video_error"))
+                continue
+
+            # Subida a Hydrax
+            async def progress_callback(percent):
+                await temp_msg.edit_text(f"{t(user_id, 'video_uploading')}\n{make_progress_bar(percent)}")
+
+            result = await upload_to_hydrax(hydrax_api, local_path, file_name, file_type, progress_callback)
+            if result:
+                await temp_msg.edit_text(f"{t(user_id, 'video_done')}\n{result}")
+                log_event(f"Video subido a Hydrax por {user_id}: {file_name}")
+            else:
+                await temp_msg.edit_text(t(user_id, "video_error"))
+                log_event(f"Error subiendo a Hydrax para {user_id}: {file_name}")
+        except Exception as e:
+            await temp_msg.edit_text(t(user_id, "video_error"))
+            log_event(f"Excepción en subida para {user_id}: {e}")
+        finally:
+            # Borra archivos temporales
+            try:
+                if local_path and os.path.exists(local_path):
+                    os.remove(local_path)
+            except Exception:
+                pass
+        # Espera un momento antes del siguiente
+        await asyncio.sleep(1)
+    user_uploading[user_id] = False
 
 @app.on_message(filters.command("start"))
 async def start(client, message):
@@ -210,7 +321,6 @@ async def hapi_receive(client, message):
     if user_id == CREATOR_ID and user_id in user_ads_state:
         state = user_ads_state[user_id]
         if state["step"] == "collecting":
-            # Guarda el mensaje y pregunta si agregar más
             state["messages"].append(message.text)
             kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton(t(user_id, "ads_yes"), callback_data="ads_more"),
@@ -219,6 +329,33 @@ async def hapi_receive(client, message):
             await message.reply(t(user_id, "ads_add_more"), reply_markup=kb)
             state["step"] = "add_more"
             log_event(f"Anuncio: Añadido mensaje por {user_id}")
+            return
+
+    # --- VIDEO/URL ENTRANTE ---
+    # Procesa solo si está permitido y tiene server Hydrax activo
+    if user_server.get(user_id, "telegram") == "hydrax":
+        # Video de Telegram
+        if message.video:
+            video_info = {
+                "file_id": message.video.file_id,
+                "file_name": message.video.file_name,
+                "mime_type": message.video.mime_type
+            }
+            user_video_queue.setdefault(user_id, []).append((message, video_info))
+            log_event(f"Video recibido de {user_id} (Telegram): {video_info['file_name']}")
+            if not user_uploading.get(user_id, False):
+                asyncio.create_task(process_video_queue(user_id))
+            else:
+                await message.reply(t(user_id, "video_queued"))
+            return
+        # URL directa
+        if is_direct_video_url(message.text):
+            user_video_queue.setdefault(user_id, []).append((message, message.text.strip()))
+            log_event(f"Video recibido de {user_id} (URL): {message.text.strip()}")
+            if not user_uploading.get(user_id, False):
+                asyncio.create_task(process_video_queue(user_id))
+            else:
+                await message.reply(t(user_id, "video_queued"))
             return
 
 @app.on_callback_query(filters.regex("^hapi_"))
@@ -250,6 +387,12 @@ async def cancel_command(client, message):
         await message.reply(t(user_id, "cancel_ok"))
         log_event(f"Usuario {user_id} canceló anuncio en curso.")
         return
+    # Vacía la cola de videos
+    if user_video_queue.get(user_id):
+        user_video_queue[user_id] = []
+        await message.reply(t(user_id, "video_cancelled"))
+        log_event(f"Usuario {user_id} vació la cola de videos.")
+        return
     await message.reply(t(user_id, "cancel_ok"))
     log_event(f"Usuario {user_id} usó /cancel.")
 
@@ -279,7 +422,6 @@ async def ads_callback(client, callback_query):
         log_event("Solicitando siguiente mensaje para anuncio (/ads)")
         return
     if callback_query.data == "ads_no_more":
-        # Muestra vista previa y pregunta si enviar/cancelar
         preview = "\n\n".join(state["messages"])
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton(t(user_id, "ads_send"), callback_data="ads_send"),
@@ -295,14 +437,11 @@ async def ads_callback(client, callback_query):
         log_event("Anuncio cancelado (/ads)")
         return
     if callback_query.data == "ads_send":
-        # Empieza el envío, muestra progreso
         state["step"] = "sending"
         preview = "\n\n".join(state["messages"])
         await callback_query.message.edit_text(t(user_id, "ads_sending"))
-        # Enviar anuncio a todos los usuarios permitidos (menos el creador)
         users_to_send = [u for u in known_users if u in allowed_users and u != CREATOR_ID]
         sent = 0
-        failed = 0
         blocked = 0
         total = len(users_to_send)
         progress_msg = await app.send_message(CREATOR_ID, t(user_id, "ads_progress").format(sent=sent, total=total, blocked=blocked))
