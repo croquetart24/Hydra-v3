@@ -3,7 +3,7 @@
     "welcome": "Welcome! The bot is now in English.",
     "choose_lang": "Which language do you want to use?",
     "lang_set": "Language changed successfully to English.",
-    "help": "This bot helps you manage announcements and files. Use /setlang to change language, /ayuda to see this help, /add and /remove to manage allowed users, /log to get the activity log, /ping to measure latency, /server to choose upload destination, /hapi to change your Hydrax API, and /cancel to abort operations. The /ads command lets you create and send announcements to all users.",
+    "help": "This bot helps you manage announcements and files. Use /setlang to change language, /ayuda to see this help, /add and /remove to manage allowed users, /log to get the activity log, /ping to measure latency, /server to choose upload destination, /hapi to change your Hydrax API, and /cancel to abort operations. The /ads command lets you create and send announcements to all users. When you send a video or direct link, it will be uploaded to Hydrax and you will see the progress.",
     "error": "An error occurred. Please try again.",
     "pinging": "Measuring latency...",
     "pong": "Pong! Latency: {ms} ms.",
@@ -26,5 +26,13 @@
     "ads_cancelled": "Announcement cancelled.",
     "ads_sending": "Sending announcement to users...",
     "ads_progress": "Sent: {sent}/{total} | Blocked: {blocked}",
-    "ads_summary": "Announcement completed.\nSent: {sent}/{total}\nBlocked users: {blocked}"
+    "ads_summary": "Announcement completed.\nSent: {sent}/{total}\nBlocked users: {blocked}",
+    "video_upload_start": "Received! Starting upload to Hydrax...",
+    "video_preparing": "Preparing the file for upload...",
+    "video_downloading": "Downloading the file...",
+    "video_uploading": "Uploading to Hydrax...",
+    "video_done": "Upload complete! Hydrax response:",
+    "video_error": "Error during video upload.",
+    "video_queued": "Your video/file has been added to the queue and will be processed after the current one.",
+    "video_cancelled": "Video queue cancelled and emptied."
 }
