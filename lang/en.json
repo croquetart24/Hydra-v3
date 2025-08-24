@@ -3,6 +3,16 @@
     "welcome": "Welcome! The bot is now in English.",
     "choose_lang": "Which language do you want to use?",
     "lang_set": "Language changed successfully to English.",
-    "help": "This bot helps you manage announcements and files. Use /setlang to change language, /ayuda to see this help, /add and /remove to manage allowed users, /log to get the activity log.",
-    "error": "An error occurred. Please try again."
+    "help": "This bot helps you manage announcements and files. Use /setlang to change language, /ayuda to see this help, /add and /remove to manage allowed users, /log to get the activity log, /ping to measure latency, /server to choose upload destination, /hapi to change your Hydrax API, and /cancel to abort operations.",
+    "error": "An error occurred. Please try again.",
+    "pinging": "Measuring latency...",
+    "pong": "Pong! Latency: {ms} ms.",
+    "choose_server": "Which server do you want to use?",
+    "server_set_telegram": "Server changed to 🚀Telegram. Files will be uploaded here.",
+    "server_set_hydrax": "Server changed to 🦎Hydrax. Videos will be uploaded to Hydrax.",
+    "send_hapi": "Send your new Hydrax API:",
+    "confirm_hapi": "Are you sure you want to use this API?\n{api}",
+    "hapi_set_ok": "Hydrax API updated successfully!",
+    "hapi_set_cancel": "Operation cancelled. API not changed.",
+    "cancel_ok": "Operation cancelled for your user."
 }
